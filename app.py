@@ -10,7 +10,6 @@ CHANNEL_NAME = "@work_ua_hub"
 
 app = Flask(__name__)
 
-# Зберігаємо вже відправлені посилання, щоб не було дублікатів
 sent_vacancies = set()
 
 @app.route("/")
@@ -22,35 +21,32 @@ def fetch_and_post_vacancies():
     
     while True:
         try:
-            print("Збираємо свіжі вакансії через RSS Work.ua...", flush=True)
-            url = "https://www.work.ua/rss/"
+            print("Збираємо свіжі вакансії з DOU...", flush=True)
+            url = "https://jobs.dou.ua/feed/"
             headers = {"User-Agent": "Mozilla/5.0"}
             
             response = requests.get(url, headers=headers, timeout=15)
             print(f"Статус відповіді RSS: {response.status_code}", flush=True)
             
             if response.status_code == 200:
-                # Парсимо XML-документ стрічки RSS
                 root = ET.fromstring(response.content)
                 items = root.findall(".//item")
                 
-                # Беремо перші 5 найсвіжіших вакансій
                 for item in items[:5]:
                     title_elem = item.find("title")
                     link_elem = item.find("link")
                     desc_elem = item.find("description")
                     
                     title = title_elem.text if title_elem is not None else "Вакансія"
-                    link = link_elem.text if link_elem is not None else "https://www.work.ua"
+                    link = link_elem.text if link_elem is not None else "https://jobs.dou.ua"
                     description = desc_elem.text if desc_elem is not None else ""
                     
                     if link and link not in sent_vacancies:
-                        # Формуємо текст поста для каналу
                         text = (
                             f"🔵 **{title}**\n\n"
-                            f"📄 {description[:150]}...\n\n"
+                            f"📄 {description[:150].strip()}...\n\n"
                             f"👉 [Відгукнутися на вакансію]({link})\n\n"
-                            f"#Україна #Робота"
+                            f"#IT #Україна"
                         )
                         
                         tg_url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
@@ -74,7 +70,6 @@ def fetch_and_post_vacancies():
         except Exception as e:
             print("ПОМИЛКА У ПАРСЕРІ:", e, flush=True)
             
-        # Наступна перевірка через 30 хвилин
         time.sleep(1800)
 
 if __name__ == "__main__":

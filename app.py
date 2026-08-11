@@ -10,65 +10,72 @@ CHANNEL_NAME = "@work_ua_hub"
 
 app = Flask(__name__)
 
-# Множина для збереження хешів вже відправлених повідомлень
+# Множина для збереження хешів вже відправлених повідомлень (щоб уникнути повторів)
 sent_messages = set()
+
+# Список публічних каналів-джерел для збору вакансій (можете змінювати на свої)
+SOURCES = [
+    "it_jobs_ua",
+    "robota_ua_chan",  # приклад публічного каналу
+    "remote_ukraine"   # приклад публічного каналу
+]
 
 @app.route("/")
 def home():
-    return "Бот працює 24/7!"
+    return "Бот для збору вакансій працює 24/7!"
 
 def fetch_and_post_vacancies():
     time.sleep(5)
     
     while True:
-        try:
-            print("Збираємо вакансії з публічного джерела...", flush=True)
-            # Читаємо публічну веб-стрічку каналу з вакансіями
-            url = "https://t.me/s/it_jobs_ua"
-            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-            
-            response = requests.get(url, headers=headers, timeout=15)
-            print(f"Статус відповіді Telegram Web: {response.status_code}", flush=True)
-            
-            if response.status_code == 200:
-                html = response.text
-                # Витягуємо тексти повідомлень за допомогою регулярних виразів
-                messages = re.findall(r'<div class="tgme_widget_message_text[^>]*>(.*?)</div>', html, re.DOTALL)
+        for channel in SOURCES:
+            try:
+                print(f"Збираємо вакансії з каналу @{channel}...", flush=True)
+                url = f"https://t.me/s/{channel}"
+                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
                 
-                # Беремо останні 5 повідомлень із ленти
-                for raw_msg in messages[-5:]:
-                    # Очищаємо від HTML-тегів
-                    clean_text = re.sub(r'<br\s*/?>', '\n', raw_msg)
-                    clean_text = re.sub(r'<.*?>', '', clean_text)
-                    clean_text = clean_text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
-                    
-                    msg_id = hash(clean_text)
-                    
-                    if clean_text and msg_id not in sent_messages and len(clean_text) > 20:
-                        post_text = f"🔵 **Свіжа вакансія:**\n\n{clean_text}\n\n#Робота #Україна"
-                        
-                        tg_url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-                        payload = {
-                            "chat_id": CHANNEL_NAME,
-                            "text": post_text,
-                            "parse_mode": "Markdown"
-                        }
-                        
-                        res = requests.post(tg_url, json=payload)
-                        if res.status_code == 200:
-                            sent_messages.add(msg_id)
-                            print("Успішно опубліковано вакансію в канал!", flush=True)
-                        else:
-                            print(f"Помилка відправки в Telegram: {res.text}", flush=True)
-                        
-                        time.sleep(5)
-            else:
-                print(f"Помилка доступу: {response.status_code}", flush=True)
+                response = requests.get(url, headers=headers, timeout=15)
                 
-        except Exception as e:
-            print("ПОМИЛКА У ПАРСЕРІ:", e, flush=True)
+                if response.status_code == 200:
+                    html = response.text
+                    messages = re.findall(r'<div class="tgme_widget_message_text[^>]*>(.*?)</div>', html, re.DOTALL)
+                    
+                    # Беремо останні 3 повідомлення з кожного каналу
+                    for raw_msg in messages[-3:]:
+                        clean_text = re.sub(r'<br\s*/?>', '\n', raw_msg)
+                        clean_text = re.sub(r'<.*?>', '', clean_text)
+                        clean_text = clean_text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
+                        
+                        msg_id = hash(clean_text)
+                        
+                        if clean_text and msg_id not in sent_messages and len(clean_text) > 20:
+                            post_text = f"🔵 **Свіжа вакансія:**\n\n{clean_text}\n\n#Робота #Україна"
+                            
+                            tg_url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+                            payload = {
+                                "chat_id": CHANNEL_NAME,
+                                "text": post_text,
+                                "parse_mode": "Markdown"
+                            }
+                            
+                            res = requests.post(tg_url, json=payload)
+                            if res.status_code == 200:
+                                sent_messages.add(msg_id)
+                                print(f"Опубліковано з @{channel}!", flush=True)
+                            else:
+                                print(f"Помилка відправки в Telegram: {res.text}", flush=True)
+                            
+                            time.sleep(4) # Пауза між постами
+                else:
+                    print(f"Не вдалося зчитати @{channel}, статус: {response.status_code}", flush=True)
+                    
+            except Exception as e:
+                print(f"ПОМИЛКА для @{channel}:", e, flush=True)
+                
+            time.sleep(5) # Пауза між каналами
             
-        # Перевірка нових постів кожні 30 хвилин
+        # Повний цикл перевірки всіх каналів повторюється кожні 30 хвилин
+        print("Цикл завершено. Чекаємо 30 хвилин до наступної перевірки...", flush=True)
         time.sleep(1800)
 
 if __name__ == "__main__":

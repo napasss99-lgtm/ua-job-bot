@@ -4,7 +4,7 @@ import requests
 from flask import Flask
 import threading
 
-TOKEN = "8859334490:AAGHo_cCVvZgFmT-NRmnUReFLUfuYM6akfU"
+TOKEN = "8859334490:AAGHo_cCVvZgFMt-NRmnUReFLUfuYM6aKfU"
 CHANNEL_NAME = "@work_ua_hub"
 
 app = Flask(__name__)

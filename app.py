@@ -23,63 +23,63 @@ SOURCES = [
     "ua_robota"
 ]
 
-# Змінна для контролю часу останньої перевірки
-last_check_time = 0
-
-def fetch_and_post_vacancies():
-    print("Збираємо вакансії з усіх каналів...", flush=True)
-    for channel in SOURCES:
-        try:
-            url = f"https://t.me/s/{channel}"
-            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-            
-            response = requests.get(url, headers=headers, timeout=15)
-            
-            if response.status_code == 200:
-                html = response.text
-                messages = re.findall(r'<div class="tgme_widget_message_text[^>]*>(.*?)</div>', html, re.DOTALL)
+def background_worker():
+    """Автономний фоновий цикл, який працює сам по собі кожні 5 хвилин"""
+    time.sleep(10) # Чекаємо трохи при старті сайту
+    while True:
+        print("=== Початок циклу перевірки каналів ===", flush=True)
+        for channel in SOURCES:
+            try:
+                print(f"Збираємо вакансії з каналу @{channel}...", flush=True)
+                url = f"https://t.me/s/{channel}"
+                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
                 
-                # Беремо останні 3 повідомлення з кожного каналу
-                for raw_msg in messages[-3:]:
-                    clean_text = re.sub(r'<br\s*/?>', '\n', raw_msg)
-                    clean_text = re.sub(r'<.*?>', '', clean_text)
-                    clean_text = clean_text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
+                response = requests.get(url, headers=headers, timeout=15)
+                
+                if response.status_code == 200:
+                    html = response.text
+                    messages = re.findall(r'<div class="tgme_widget_message_text[^>]*>(.*?)</div>', html, re.DOTALL)
                     
-                    msg_id = hash(clean_text)
+                    # Беремо останні 3 повідомлення з кожного каналу
+                    for raw_msg in messages[-3:]:
+                        clean_text = re.sub(r'<br\s*/?>', '\n', raw_msg)
+                        clean_text = re.sub(r'<.*?>', '', clean_text)
+                        clean_text = clean_text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
+                        
+                        msg_id = hash(clean_text)
+                        
+                        if clean_text and msg_id not in sent_messages and len(clean_text) > 20:
+                            post_text = f"🔵 **Свіжа вакансія:**\n\n{clean_text}\n\n#Робота #Україна"
+                            
+                            tg_url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+                            payload = {
+                                "chat_id": CHANNEL_NAME,
+                                "text": post_text,
+                                "parse_mode": "Markdown"
+                            }
+                            
+                            res = requests.post(tg_url, json=payload)
+                            if res.status_code == 200:
+                                sent_messages.add(msg_id)
+                                print(f"Опубліковано з @{channel}!", flush=True)
+                            
+                            time.sleep(2)
+                else:
+                    print(f"Не вдалося зчитати @{channel}, статус: {response.status_code}", flush=True)
                     
-                    if clean_text and msg_id not in sent_messages and len(clean_text) > 20:
-                        post_text = f"🔵 **Свіжа вакансія:**\n\n{clean_text}\n\n#Робота #Україна"
-                        
-                        tg_url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-                        payload = {
-                            "chat_id": CHANNEL_NAME,
-                            "text": post_text,
-                            "parse_mode": "Markdown"
-                        }
-                        
-                        res = requests.post(tg_url, json=payload)
-                        if res.status_code == 200:
-                            sent_messages.add(msg_id)
-                            print(f"Опубліковано з @{channel}!", flush=True)
-                        
-                        time.sleep(2)
-        except Exception as e:
-            print(f"ПОМИЛКА для @{channel}:", e, flush=True)
-            
-    print("Цикл перевірки завершено.", flush=True)
+            except Exception as e:
+                print(f"ПОМИЛКА для @{channel}:", e, flush=True)
+                
+        print("=== Цикл завершено. Чекаємо 5 хвилин до наступної перевірки ===", flush=True)
+        time.sleep(300) # Пауза 5 хвилин перед наступним колом
 
 @app.route("/")
 def home():
-    global last_check_time
-    current_time = time.time()
-    
-    # Якщо з моменту останньої перевірки минуло більше 4 хвилин, запускаємо збір у фоні
-    if current_time - last_check_time > 240:
-        last_check_time = current_time
-        threading.Thread(target=fetch_and_post_vacancies).start()
-        return "Бот працює, запущено збір вакансій!"
-        
-    return "Бот працює 24/7!"
+    return "Бот для збору вакансій працює 24/7!"
+
+# Запускаємо автономний фоновий потік одразу при старті програми
+t = threading.Thread(target=background_worker, daemon=True)
+t.start()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))

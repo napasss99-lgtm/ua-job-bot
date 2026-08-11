@@ -13,7 +13,7 @@ app = Flask(__name__)
 # Множина для збереження хешів вже відправлених повідомлень
 sent_messages = set()
 
-# Усі публічні канали (і старі, і нові разом)
+# Усі публічні канали-джерела
 SOURCES = [
     "it_jobs_ua",
     "robota_ua_chan",
@@ -77,8 +77,8 @@ def fetch_and_post_vacancies():
                 
             time.sleep(5)
             
-        print("Цикл завершено. Чекаємо 30 хвилин до наступної перевірки...", flush=True)
-        time.sleep(1800)
+        print("Цикл завершено. Чекаємо 5 хвилин до наступної перевірки...", flush=True)
+        time.sleep(300)
 
 if __name__ == "__main__":
     t = threading.Thread(target=fetch_and_post_vacancies)

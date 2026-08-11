@@ -13,8 +13,11 @@ app = Flask(__name__)
 # Множина для збереження хешів вже відправлених повідомлень
 sent_messages = set()
 
-# Список ваші каналів-джерел
+# Усі публічні канали (і старі, і нові разом)
 SOURCES = [
+    "it_jobs_ua",
+    "robota_ua_chan",
+    "remote_ukraine",
     "JobUkraineForex",
     "rabota_ukraine_podrabotka",
     "ua_robota"

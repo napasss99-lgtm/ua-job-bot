@@ -10,14 +10,14 @@ CHANNEL_NAME = "@work_ua_hub"
 
 app = Flask(__name__)
 
-# Множина для збереження хешів вже відправлених повідомлень (щоб уникнути повторів)
+# Множина для збереження хешів вже відправлених повідомлень
 sent_messages = set()
 
-# Список публічних каналів-джерел для збору вакансій (можете змінювати на свої)
+# Список ваші каналів-джерел
 SOURCES = [
-    "it_jobs_ua",
-    "robota_ua_chan",  # приклад публічного каналу
-    "remote_ukraine"   # приклад публічного каналу
+    "JobUkraineForex",
+    "rabota_ukraine_podrabotka",
+    "ua_robota"
 ]
 
 @app.route("/")
@@ -65,16 +65,15 @@ def fetch_and_post_vacancies():
                             else:
                                 print(f"Помилка відправки в Telegram: {res.text}", flush=True)
                             
-                            time.sleep(4) # Пауза між постами
+                            time.sleep(4)
                 else:
                     print(f"Не вдалося зчитати @{channel}, статус: {response.status_code}", flush=True)
                     
             except Exception as e:
                 print(f"ПОМИЛКА для @{channel}:", e, flush=True)
                 
-            time.sleep(5) # Пауза між каналами
+            time.sleep(5)
             
-        # Повний цикл перевірки всіх каналів повторюється кожні 30 хвилин
         print("Цикл завершено. Чекаємо 30 хвилин до наступної перевірки...", flush=True)
         time.sleep(1800)
 

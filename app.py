@@ -9,7 +9,6 @@ CHANNEL_NAME = "@work_ua_hub"
 
 app = Flask(__name__)
 
-# Множина для зберігання ID вже відправлених вакансій (щоб уникнути дублікатів)
 sent_vacancies = set()
 
 @app.route("/")
@@ -17,23 +16,29 @@ def home():
     return "Бот для пошуку вакансій працює 24/7!"
 
 def fetch_and_post_vacancies():
-    # Робимо коротку паузу при старті, щоб сервер встиг повністю запуститися
     time.sleep(5)
     
     while True:
         try:
             print("Шукаємо нові вакансії на robota.ua...", flush=True)
             
-            # Запит до публічного API пошуку robota.ua по всій Україні
+            # Повні заголовки справжнього браузера для обходу захисту 403
             url = "https://api.robota.ua/vacancies?page=0"
-            headers = {"User-Agent": "Mozilla/5.0"}
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                "Accept": "application/json, text/plain, */*",
+                "Accept-Language": "uk-UA,uk;q=0.9,en-US;q=0.8,en;q=0.7",
+                "Referer": "https://robota.ua/",
+                "Origin": "https://robota.ua/"
+            }
+            
             response = requests.get(url, headers=headers, timeout=15)
+            print(코드_статус := f"Статус відповіді robota.ua: {response.status_code}", flush=True)
             
             if response.status_code == 200:
                 data = response.json()
                 vacancies = data.get("items", [])
                 
-                # Беремо перші 5 найсвіжіших вакансій за раз
                 for vac in vacancies[:5]:
                     vac_id = str(vac.get("id"))
                     
@@ -42,7 +47,6 @@ def fetch_and_post_vacancies():
                         company = vac.get("company", {}).get("name", "Компанія")
                         salary_data = vac.get("salary")
                         
-                        # Обробка зарплати
                         if salary_data and salary_data.get("amount"):
                             salary = f"{salary_data.get('amount')} грн"
                         else:
@@ -50,7 +54,6 @@ def fetch_and_post_vacancies():
                             
                         city = vac.get("city", {}).get("name", "Україна")
                         
-                        # Формуємо текст повідомлення з хештегами
                         text = (
                             f"🔵 **{title}**\n\n"
                             f"🏢 Компанія: {company}\n"
@@ -60,7 +63,6 @@ def fetch_and_post_vacancies():
                             f"#{city.replace(' ', '')} #Україна"
                         )
                         
-                        # Надсилаємо в Telegram канал
                         tg_url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
                         payload = {
                             "chat_id": CHANNEL_NAME,
@@ -75,19 +77,16 @@ def fetch_and_post_vacancies():
                         else:
                             print(f"Помилка відправки в Telegram: {res.text}", flush=True)
                         
-                        # Пауза між постами, щоб уникнути обмежень Telegram
                         time.sleep(5)
             else:
-                print(f"Помилка запиту до robota.ua: {response.status_code}", flush=True)
+                print(f"Помилка доступу до сайту (код {response.status_code})", flush=True)
                 
         except Exception as e:
             print("ПОМИЛКА У ПАРСЕРІ:", e, flush=True)
             
-        # Повторна перевірка нових вакансій кожні 30 хвилин (1800 секунд)
         time.sleep(1800)
 
 if __name__ == "__main__":
-    # Запуск фонового потоку для автоматичного парсингу та публікації
     t = threading.Thread(target=fetch_and_post_vacancies)
     t.daemon = True
     t.start()

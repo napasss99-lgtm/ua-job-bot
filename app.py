@@ -17,12 +17,13 @@ def send_test_post():
     print("Очікування 10 секунд перед відправкою...", flush=True)
     time.sleep(10)
     try:
-        url = f"https://api.telegram.org/bot{TOKEN}/sendPhoto"
-        photo_url = "https://raw.githubusercontent.com/napasss99-lgnm/ua-job-bot/main/Gemini_Generated_Image_bfrpo9bfrpo9bfrp.png"
-        caption = "🔵 Бот успішно запущений і працює!"
-        payload = {"chat_id": CHANNEL_NAME, "photo": photo_url, "caption": caption}
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+        payload = {
+            "chat_id": CHANNEL_NAME, 
+            "text": "🔵 Бот успішно запущений і працює у каналі!"
+        }
         
-        print("Надсилаємо запит до Telegram...", flush=True)
+        print("Надсилаємо повідомлення до Telegram...", flush=True)
         response = requests.post(url, json=payload)
         print("ВІДПОВІДЬ ВІД ТЕЛЕГРАМУ:", response.text, flush=True)
     except Exception as e:

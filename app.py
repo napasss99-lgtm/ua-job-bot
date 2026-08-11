@@ -20,8 +20,9 @@ def send_test_post():
         photo_url = "https://raw.githubusercontent.com/napasss99-lgtm/ua-job-bot/main/Gemini_Generated_Image_bfrpo9bfrpo9bfrp.png"
         caption = "🔵 Бот успішно запущений і працює!"
         payload = {"chat_id": CHANNEL_NAME, "photo": photo_url, "caption": caption}
-        requests.post(url, json=payload)
-        print("Пост відправлено!")
+        
+        response = requests.post(url, json=payload)
+        print("ВІДПОВІДЬ ВІД ТЕЛЕГРАМУ:", response.text)
     except Exception as e:
         print("Помилка:", e)
 

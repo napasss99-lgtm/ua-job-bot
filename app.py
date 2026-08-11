@@ -1,7 +1,7 @@
 import os
 import time
+import re
 import requests
-import xml.etree.ElementTree as ET
 from flask import Flask
 import threading
 
@@ -10,66 +10,65 @@ CHANNEL_NAME = "@work_ua_hub"
 
 app = Flask(__name__)
 
-sent_vacancies = set()
+# Множина для збереження хешів вже відправлених повідомлень
+sent_messages = set()
 
 @app.route("/")
 def home():
-    return "Бот для вакансій працює 24/7!"
+    return "Бот працює 24/7!"
 
 def fetch_and_post_vacancies():
     time.sleep(5)
     
     while True:
         try:
-            print("Збираємо свіжі вакансії з DOU...", flush=True)
-            url = "https://jobs.dou.ua/feed/"
-            headers = {"User-Agent": "Mozilla/5.0"}
+            print("Збираємо вакансії з публічного джерела...", flush=True)
+            # Читаємо публічну веб-стрічку каналу з вакансіями
+            url = "https://t.me/s/it_jobs_ua"
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
             
             response = requests.get(url, headers=headers, timeout=15)
-            print(f"Статус відповіді RSS: {response.status_code}", flush=True)
+            print(f"Статус відповіді Telegram Web: {response.status_code}", flush=True)
             
             if response.status_code == 200:
-                root = ET.fromstring(response.content)
-                items = root.findall(".//item")
+                html = response.text
+                # Витягуємо тексти повідомлень за допомогою регулярних виразів
+                messages = re.findall(r'<div class="tgme_widget_message_text[^>]*>(.*?)</div>', html, re.DOTALL)
                 
-                for item in items[:5]:
-                    title_elem = item.find("title")
-                    link_elem = item.find("link")
-                    desc_elem = item.find("description")
+                # Беремо останні 5 повідомлень із ленти
+                for raw_msg in messages[-5:]:
+                    # Очищаємо від HTML-тегів
+                    clean_text = re.sub(r'<br\s*/?>', '\n', raw_msg)
+                    clean_text = re.sub(r'<.*?>', '', clean_text)
+                    clean_text = clean_text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
                     
-                    title = title_elem.text if title_elem is not None else "Вакансія"
-                    link = link_elem.text if link_elem is not None else "https://jobs.dou.ua"
-                    description = desc_elem.text if desc_elem is not None else ""
+                    msg_id = hash(clean_text)
                     
-                    if link and link not in sent_vacancies:
-                        text = (
-                            f"🔵 **{title}**\n\n"
-                            f"📄 {description[:150].strip()}...\n\n"
-                            f"👉 [Відгукнутися на вакансію]({link})\n\n"
-                            f"#IT #Україна"
-                        )
+                    if clean_text and msg_id not in sent_messages and len(clean_text) > 20:
+                        post_text = f"🔵 **Свіжа вакансія:**\n\n{clean_text}\n\n#Робота #Україна"
                         
                         tg_url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
                         payload = {
                             "chat_id": CHANNEL_NAME,
-                            "text": text,
+                            "text": post_text,
                             "parse_mode": "Markdown"
                         }
                         
                         res = requests.post(tg_url, json=payload)
                         if res.status_code == 200:
-                            sent_vacancies.add(link)
-                            print(f"Успішно опубліковано: {title}", flush=True)
+                            sent_messages.add(msg_id)
+                            print("Успішно опубліковано вакансію в канал!", flush=True)
                         else:
                             print(f"Помилка відправки в Telegram: {res.text}", flush=True)
                         
                         time.sleep(5)
             else:
-                print(f"Помилка завантаження RSS: {response.status_code}", flush=True)
+                print(f"Помилка доступу: {response.status_code}", flush=True)
                 
         except Exception as e:
             print("ПОМИЛКА У ПАРСЕРІ:", e, flush=True)
             
+        # Перевірка нових постів кожні 30 хвилин
         time.sleep(1800)
 
 if __name__ == "__main__":
